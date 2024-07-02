@@ -18,11 +18,10 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
-#include "php_ini.h"
 #include "php_shmop.h"
 #include "shmop_arginfo.h"
 

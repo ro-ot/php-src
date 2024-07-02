@@ -17,18 +17,16 @@
 
 /* {{{ includes */
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include <php.h>
 
 #include <unicode/uidna.h>
 #include <unicode/ustring.h>
-#include "ext/standard/php_string.h"
 
 #include "idn.h"
 #include "intl_error.h"
-#include "intl_convert.h"
 /* }}} */
 
 enum {

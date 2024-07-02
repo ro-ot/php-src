@@ -17,7 +17,7 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
@@ -31,6 +31,7 @@
 #include "php_pdo_pgsql.h"
 #include "php_pdo_pgsql_int.h"
 #include "zend_exceptions.h"
+#include "zend_smart_str.h"
 #include "pgsql_driver_arginfo.h"
 
 static bool pgsql_handle_in_transaction(pdo_dbh_t *dbh);
@@ -131,7 +132,7 @@ static void pdo_pgsql_fetch_error_func(pdo_dbh_t *dbh, pdo_stmt_t *stmt, zval *i
 }
 /* }}} */
 
-static void pdo_pgsql_cleanup_notice_callback(pdo_pgsql_db_handle *H) /* {{{ */
+void pdo_pgsql_cleanup_notice_callback(pdo_pgsql_db_handle *H) /* {{{ */
 {
 	if (H->notice_callback) {
 		zend_fcc_dtor(H->notice_callback);
@@ -177,7 +178,7 @@ static int pgsql_lob_seek(php_stream *stream, zend_off_t offset, int whence,
 		zend_off_t *newoffset)
 {
 	struct pdo_pgsql_lob_self *self = (struct pdo_pgsql_lob_self*)stream->abstract;
-#if defined(HAVE_PG_LO64) && defined(ZEND_ENABLE_ZVAL_LONG64)
+#ifdef ZEND_ENABLE_ZVAL_LONG64
 	zend_off_t pos = lo_lseek64(self->conn, self->lfd, offset, whence);
 #else
 	zend_off_t pos = lo_lseek(self->conn, self->lfd, offset, whence);
@@ -1241,8 +1242,7 @@ PHP_METHOD(PDO_PGSql_Ext, pgsqlGetPid)
 }
 /* }}} */
 
-/* {{{ proto void PDO::pgsqlSetNoticeCallback(mixed callback)
-   Sets a callback to receive DB notices (after client_min_messages has been set) */
+/* {{{ Sets a callback to receive DB notices (after client_min_messages has been set) */
 PHP_METHOD(PDO_PGSql_Ext, pgsqlSetNoticeCallback)
 {
 	zend_fcall_info fci = empty_fcall_info;
@@ -1252,7 +1252,7 @@ PHP_METHOD(PDO_PGSql_Ext, pgsqlSetNoticeCallback)
 	}
 
 	pdo_dbh_t *dbh = Z_PDO_DBH_P(ZEND_THIS);
-	PDO_CONSTRUCT_CHECK;
+	PDO_CONSTRUCT_CHECK_WITH_CLEANUP(cleanup);
 
 	pdo_pgsql_db_handle *H = (pdo_pgsql_db_handle *)dbh->driver_data;
 
@@ -1262,6 +1262,14 @@ PHP_METHOD(PDO_PGSql_Ext, pgsqlSetNoticeCallback)
 		H->notice_callback = emalloc(sizeof(zend_fcall_info_cache));
 		zend_fcc_dup(H->notice_callback, &fcc);
 	}
+
+	return;
+
+cleanup:
+	if (ZEND_FCC_INITIALIZED(fcc)) {
+		zend_fcc_dtor(&fcc);
+	}
+	RETURN_THROWS();
 }
 /* }}} */
 
@@ -1314,15 +1322,17 @@ static const struct pdo_dbh_methods pgsql_methods = {
 	pdo_pgsql_get_driver_methods,  /* get_driver_methods */
 	NULL,
 	pgsql_handle_in_transaction,
-	NULL /* get_gc */
+	NULL, /* get_gc */
+	pdo_pgsql_scanner
 };
 
 static int pdo_pgsql_handle_factory(pdo_dbh_t *dbh, zval *driver_options) /* {{{ */
 {
 	pdo_pgsql_db_handle *H;
 	int ret = 0;
-	char *conn_str, *p, *e;
+	char *p, *e;
 	zend_string *tmp_user, *tmp_pass;
+	smart_str conn_str = {0};
 	zend_long connect_timeout = 30;
 
 	H = pecalloc(1, sizeof(pdo_pgsql_db_handle), dbh->is_persistent);
@@ -1353,18 +1363,20 @@ static int pdo_pgsql_handle_factory(pdo_dbh_t *dbh, zval *driver_options) /* {{{
 	tmp_user = !strstr((char *) dbh->data_source, "user=") ? _pdo_pgsql_escape_credentials(dbh->username) : NULL;
 	tmp_pass = !strstr((char *) dbh->data_source, "password=") ? _pdo_pgsql_escape_credentials(dbh->password) : NULL;
 
+	smart_str_appends(&conn_str, dbh->data_source);
+	smart_str_append_printf(&conn_str, " connect_timeout=" ZEND_LONG_FMT, connect_timeout);
+
 	/* support both full connection string & connection string + login and/or password */
-	if (tmp_user && tmp_pass) {
-		spprintf(&conn_str, 0, "%s user='%s' password='%s' connect_timeout=" ZEND_LONG_FMT, (char *) dbh->data_source, ZSTR_VAL(tmp_user), ZSTR_VAL(tmp_pass), connect_timeout);
-	} else if (tmp_user) {
-		spprintf(&conn_str, 0, "%s user='%s' connect_timeout=" ZEND_LONG_FMT, (char *) dbh->data_source, ZSTR_VAL(tmp_user), connect_timeout);
-	} else if (tmp_pass) {
-		spprintf(&conn_str, 0, "%s password='%s' connect_timeout=" ZEND_LONG_FMT, (char *) dbh->data_source, ZSTR_VAL(tmp_pass), connect_timeout);
-	} else {
-		spprintf(&conn_str, 0, "%s connect_timeout=" ZEND_LONG_FMT, (char *) dbh->data_source, connect_timeout);
+	if (tmp_user) {
+		smart_str_append_printf(&conn_str, " user='%s'", ZSTR_VAL(tmp_user));
 	}
 
-	H->server = PQconnectdb(conn_str);
+	if (tmp_pass) {
+		smart_str_append_printf(&conn_str, " password='%s'", ZSTR_VAL(tmp_pass));
+	}
+	smart_str_0(&conn_str);
+
+	H->server = PQconnectdb(ZSTR_VAL(conn_str.s));
 	H->lob_streams = (HashTable *) pemalloc(sizeof(HashTable), dbh->is_persistent);
 	zend_hash_init(H->lob_streams, 0, NULL, NULL, 1);
 
@@ -1375,7 +1387,7 @@ static int pdo_pgsql_handle_factory(pdo_dbh_t *dbh, zval *driver_options) /* {{{
 		zend_string_release_ex(tmp_pass, 0);
 	}
 
-	efree(conn_str);
+	smart_str_free(&conn_str);
 
 	if (PQstatus(H->server) != CONNECTION_OK) {
 		pdo_pgsql_error(dbh, PGRES_FATAL_ERROR, PHP_PDO_PGSQL_CONNECTION_FAILURE_SQLSTATE);

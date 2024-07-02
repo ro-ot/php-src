@@ -20,8 +20,6 @@
 #define PHP_SOAP_H
 
 #include "php.h"
-#include "php_globals.h"
-#include "ext/standard/info.h"
 #include "ext/standard/php_standard.h"
 #if defined(HAVE_PHP_SESSION) && !defined(COMPILE_DL_SESSION)
 #include "ext/session/php_session.h"
@@ -160,7 +158,6 @@ ZEND_BEGIN_MODULE_GLOBALS(soap)
 	char*      error_code;
 	zval       error_object;
 	bool       use_soap_error_handler;
-	char       cache;
 	char       cache_mode;
 	char       cache_enabled;
 	char*      cache_dir;

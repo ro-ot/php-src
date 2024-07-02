@@ -15,11 +15,10 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
-#include "php_ini.h"
 #include "php_gmp.h"
 #include "php_gmp_int.h"
 #include "ext/standard/info.h"

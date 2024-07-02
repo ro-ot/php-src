@@ -19,7 +19,7 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
@@ -27,7 +27,6 @@
 #include "zend_attributes.h"
 
 #include "ext/standard/info.h"
-#include "ext/standard/php_standard.h"
 #include "Zend/zend_interfaces.h"
 #include "zend_smart_str.h"
 

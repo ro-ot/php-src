@@ -13,11 +13,11 @@
 #ifndef TSRM_H
 #define TSRM_H
 
-#if !defined(__CYGWIN__) && defined(WIN32)
+#if !defined(__CYGWIN__) && defined(_WIN32)
 # define TSRM_WIN32
-# include "Zend/zend_config.w32.h"
+# include <Zend/zend_config.w32.h>
 #else
-# include "main/php_config.h"
+# include <main/php_config.h>
 #endif
 
 #include <stdint.h>

@@ -17,15 +17,14 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
 #if defined(HAVE_LIBXML) && defined(HAVE_SIMPLEXML)
 
-#include "php_ini.h"
 #include "ext/standard/info.h"
-#include "ext/standard/php_string.h"
+#include "ext/standard/php_string.h" /* For php_trim() */
 #include "php_simplexml.h"
 #include "php_simplexml_exports.h"
 #include "simplexml_arginfo.h"
@@ -1436,6 +1435,35 @@ static void sxe_add_namespaces(php_sxe_object *sxe, xmlNodePtr node, bool recurs
 	}
 } /* }}} */
 
+static inline void sxe_object_free_iterxpath(php_sxe_object *sxe)
+{
+	if (!Z_ISUNDEF(sxe->iter.data)) {
+		zval_ptr_dtor(&sxe->iter.data);
+		ZVAL_UNDEF(&sxe->iter.data);
+	}
+
+	if (sxe->iter.name) {
+		efree(sxe->iter.name);
+		sxe->iter.name = NULL;
+	}
+	if (sxe->iter.nsprefix) {
+		efree(sxe->iter.nsprefix);
+		sxe->iter.nsprefix = NULL;
+	}
+	if (!Z_ISUNDEF(sxe->tmp)) {
+		zval_ptr_dtor(&sxe->tmp);
+		ZVAL_UNDEF(&sxe->tmp);
+	}
+
+	php_libxml_node_decrement_resource((php_libxml_node_object *)sxe);
+
+	if (sxe->xpath) {
+		xmlXPathFreeContext(sxe->xpath);
+		sxe->xpath = NULL;
+	}
+}
+
+
 /* {{{ Return all namespaces in use */
 PHP_METHOD(SimpleXMLElement, getNamespaces)
 {
@@ -2095,29 +2123,7 @@ static void sxe_object_free_storage(zend_object *object)
 
 	zend_object_std_dtor(&sxe->zo);
 
-	if (!Z_ISUNDEF(sxe->iter.data)) {
-		zval_ptr_dtor(&sxe->iter.data);
-		ZVAL_UNDEF(&sxe->iter.data);
-	}
-
-	if (sxe->iter.name) {
-		efree(sxe->iter.name);
-		sxe->iter.name = NULL;
-	}
-	if (sxe->iter.nsprefix) {
-		efree(sxe->iter.nsprefix);
-		sxe->iter.nsprefix = NULL;
-	}
-	if (!Z_ISUNDEF(sxe->tmp)) {
-		zval_ptr_dtor(&sxe->tmp);
-		ZVAL_UNDEF(&sxe->tmp);
-	}
-
-	php_libxml_node_decrement_resource((php_libxml_node_object *)sxe);
-
-	if (sxe->xpath) {
-		xmlXPathFreeContext(sxe->xpath);
-	}
+	sxe_object_free_iterxpath(sxe);
 
 	if (sxe->properties) {
 		zend_hash_destroy(sxe->properties);
@@ -2317,10 +2323,11 @@ PHP_METHOD(SimpleXMLElement, __construct)
 	PHP_LIBXML_RESTORE_GLOBALS(read_file_or_memory);
 
 	if (!docp) {
-		((php_libxml_node_object *)sxe)->document = NULL;
 		zend_throw_exception(zend_ce_exception, "String could not be parsed as XML", 0);
 		RETURN_THROWS();
 	}
+
+	sxe_object_free_iterxpath(sxe);
 
 	sxe->iter.nsprefix = ns_len ? (xmlChar*)estrdup(ns) : NULL;
 	sxe->iter.isprefix = isprefix;

@@ -18,7 +18,7 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include <time.h>
@@ -52,7 +52,6 @@
 #include "Zend/zend_virtual_cwd.h"
 #include "ext/spl/spl_array.h"
 #include "ext/spl/spl_directory.h"
-#include "ext/spl/spl_engine.h"
 #include "ext/spl/spl_exceptions.h"
 #include "ext/spl/spl_iterators.h"
 #include "php_phar.h"

@@ -15,17 +15,15 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
-#include "php_ini.h"
 #include "php_main.h"
 #include "ext/standard/info.h"
 #include "php_spl.h"
 #include "php_spl_arginfo.h"
 #include "spl_functions.h"
-#include "spl_engine.h"
 #include "spl_array.h"
 #include "spl_directory.h"
 #include "spl_iterators.h"

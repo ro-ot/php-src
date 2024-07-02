@@ -24,11 +24,10 @@
 #endif
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
-#include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_pcntl.h"
 #include "php_signal.h"
@@ -714,8 +713,7 @@ PHP_FUNCTION(pcntl_signal)
 	if (!PCNTL_G(spares)) {
 		/* since calling malloc() from within a signal handler is not portable,
 		 * pre-allocate a few records for recording signals */
-		int i;
-		for (i = 0; i < PCNTL_G(num_signals); i++) {
+		for (unsigned int i = 0; i < PCNTL_G(num_signals); i++) {
 			struct php_pcntl_pending_signal *psig;
 
 			psig = emalloc(sizeof(*psig));
@@ -903,7 +901,7 @@ PHP_FUNCTION(pcntl_sigprocmask)
 			RETURN_THROWS();
 		}
 
-		for (int signal_no = 1; signal_no < PCNTL_G(num_signals); ++signal_no) {
+		for (unsigned int signal_no = 1; signal_no < PCNTL_G(num_signals); ++signal_no) {
 			if (sigismember(&old_set, signal_no) != 1) {
 				continue;
 			}
@@ -1656,7 +1654,7 @@ PHP_FUNCTION(pcntl_setcpuaffinity)
 
 	// 0 == getpid in this context, we're just saving a syscall
 	pid = pid_is_null ? 0 : pid;
-	zend_ulong maxcpus = (zend_ulong)sysconf(_SC_NPROCESSORS_CONF);
+	zend_long maxcpus = sysconf(_SC_NPROCESSORS_CONF);
 	PCNTL_CPU_ZERO(mask);
 
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(hmask), ncpu) {
@@ -1687,7 +1685,7 @@ PHP_FUNCTION(pcntl_setcpuaffinity)
 			zend_argument_value_error(2, "cpu id must be between 0 and " ZEND_ULONG_FMT " (" ZEND_LONG_FMT ")", maxcpus, cpu);
 			RETURN_THROWS();
 		}
-		       
+
 		if (!PCNTL_CPU_ISSET(cpu, mask)) {
 			PCNTL_CPU_SET(cpu, mask);
 		}

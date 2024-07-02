@@ -17,11 +17,12 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
 #if defined(HAVE_LIBXML) && defined(HAVE_DOM)
+#include "zend_enum.h"
 #include "php_dom.h"
 #include "nodelist.h"
 #include "html_collection.h"
@@ -62,6 +63,7 @@ PHP_DOM_EXPORT zend_class_entry *dom_attr_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_modern_attr_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_element_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_modern_element_class_entry;
+PHP_DOM_EXPORT zend_class_entry *dom_html_element_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_text_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_modern_text_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_comment_class_entry;
@@ -84,6 +86,7 @@ PHP_DOM_EXPORT zend_class_entry *dom_xpath_class_entry;
 PHP_DOM_EXPORT zend_class_entry *dom_modern_xpath_class_entry;
 #endif
 PHP_DOM_EXPORT zend_class_entry *dom_namespace_node_class_entry;
+PHP_DOM_EXPORT zend_class_entry *dom_adjacent_position_class_entry;
 /* }}} */
 
 static zend_object_handlers dom_object_handlers;
@@ -522,7 +525,7 @@ static void dom_import_simplexml_common(INTERNAL_FUNCTION_PARAMETERS, php_libxml
 				zend_argument_type_error(1, "must not be already imported as a DOMNode");
 			} else {
 				zend_argument_type_error(1, "must not be already imported as a Dom\\Node");
-			}			
+			}
 			RETURN_THROWS();
 		}
 
@@ -598,7 +601,9 @@ static zend_object *dom_objects_store_clone_obj(zend_object *zobject) /* {{{ */
 			if (cloned_node != NULL) {
 				dom_update_refcount_after_clone(intern, node, clone, cloned_node);
 			}
-			clone->document->private_data = php_dom_libxml_ns_mapper_header(ns_mapper);
+			if (ns_mapper != NULL) {
+				clone->document->private_data = php_dom_libxml_ns_mapper_header(ns_mapper);
+			}
 		}
 	}
 
@@ -729,6 +734,8 @@ PHP_MINIT_FUNCTION(dom)
 
 	zend_hash_init(&classes, 0, NULL, NULL, true);
 
+	dom_adjacent_position_class_entry = register_class_Dom_AdjacentPosition();
+
 	dom_domexception_class_entry = register_class_DOMException(zend_ce_exception);
 
 	dom_parentnode_class_entry = register_class_DOMParentNode();
@@ -845,6 +852,9 @@ PHP_MINIT_FUNCTION(dom)
 	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "firstElementChild", dom_parent_node_first_element_child_read, NULL);
 	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "lastElementChild", dom_parent_node_last_element_child_read, NULL);
 	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "childElementCount", dom_parent_node_child_element_count, NULL);
+	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "body", dom_html_document_body_read, dom_html_document_body_write);
+	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "head", dom_html_document_head_read, NULL);
+	DOM_REGISTER_PROP_HANDLER(&dom_abstract_base_document_prop_handlers, "title", dom_html_document_title_read, dom_html_document_title_write);
 	zend_hash_merge(&dom_abstract_base_document_prop_handlers, &dom_modern_node_prop_handlers, NULL, false);
 	/* No need to register in &classes because this is an abstract class handler. */
 
@@ -1032,6 +1042,11 @@ PHP_MINIT_FUNCTION(dom)
 	zend_hash_merge(&dom_modern_element_prop_handlers, &dom_modern_node_prop_handlers, NULL, false);
 	DOM_OVERWRITE_PROP_HANDLER(&dom_modern_element_prop_handlers, "textContent", dom_node_text_content_read, dom_node_text_content_write);
 	zend_hash_add_new_ptr(&classes, dom_modern_element_class_entry->name, &dom_modern_element_prop_handlers);
+
+	dom_html_element_class_entry = register_class_Dom_HTMLElement(dom_modern_element_class_entry);
+	dom_html_element_class_entry->create_object = dom_objects_new;
+	dom_html_element_class_entry->default_object_handlers = &dom_object_handlers;
+	zend_hash_add_new_ptr(&classes, dom_html_element_class_entry->name, &dom_modern_element_prop_handlers);
 
 	dom_text_class_entry = register_class_DOMText(dom_characterdata_class_entry);
 	dom_text_class_entry->create_object = dom_objects_new;
@@ -1532,6 +1547,19 @@ void php_dom_create_iterator(zval *return_value, dom_iterator_type iterator_type
 }
 /* }}} */
 
+static zend_always_inline zend_class_entry *dom_get_element_ce(const xmlNode *node, bool modern)
+{
+	if (modern) {
+		if (php_dom_ns_is_fast(node, php_dom_ns_is_html_magic_token)) {
+			return dom_html_element_class_entry;
+		} else {
+			return dom_modern_element_class_entry;
+		}
+	} else {
+		return dom_element_class_entry;
+	}
+}
+
 /* {{{ php_dom_create_object */
 PHP_DOM_EXPORT bool php_dom_create_object(xmlNodePtr obj, zval *return_value, dom_object *domobj)
 {
@@ -1563,7 +1591,7 @@ PHP_DOM_EXPORT bool php_dom_create_object(xmlNodePtr obj, zval *return_value, do
 		}
 		case XML_ELEMENT_NODE:
 		{
-			ce = dom_get_element_ce(modern);
+			ce = dom_get_element_ce(obj, modern);
 			break;
 		}
 		case XML_ATTRIBUTE_NODE:
@@ -1854,7 +1882,7 @@ void php_dom_normalize_modern(xmlNodePtr this)
 
 			/* 3. Let data be the concatenation of the data of node’s contiguous exclusive Text nodes (excluding itself), in tree order.
 			 * 4. Replace data with node node, offset length, count 0, and data data.
-			 * 7. Remove node’s contiguous exclusive Text nodes (excluding itself), in tree order. 
+			 * 7. Remove node’s contiguous exclusive Text nodes (excluding itself), in tree order.
 			 *    => In other words: Concat every contiguous text node into node and delete the merged nodes. */
 			dom_merge_adjacent_exclusive_text_nodes(node);
 

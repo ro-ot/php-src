@@ -15,7 +15,7 @@
 */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
@@ -23,12 +23,11 @@
 #include "ext/standard/info.h"
 #include "php_sqlite3.h"
 #include "php_sqlite3_structs.h"
-#include "main/SAPI.h"
+#include "SAPI.h"
 
 #include <sqlite3.h>
 
 #include "zend_exceptions.h"
-#include "SAPI.h"
 #include "sqlite3_arginfo.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(sqlite3)

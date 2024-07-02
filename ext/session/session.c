@@ -16,7 +16,7 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "php.h"
@@ -32,7 +32,6 @@
 #include <fcntl.h>
 
 #include "php_ini.h"
-#include "SAPI.h"
 #include "rfc1867.h"
 #include "php_variables.h"
 #include "php_session.h"
