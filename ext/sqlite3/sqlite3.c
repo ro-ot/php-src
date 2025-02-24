@@ -2122,7 +2122,6 @@ static int php_sqlite3_authorizer(void *autharg, int action, const char *arg1, c
 
 	/* Free local return and argument values */
 	zval_ptr_dtor(&retval);
-	zval_ptr_dtor(&argv[0]);
 	zval_ptr_dtor(&argv[1]);
 	zval_ptr_dtor(&argv[2]);
 	zval_ptr_dtor(&argv[3]);
@@ -2215,13 +2214,15 @@ static HashTable *php_sqlite3_get_gc(zend_object *object, zval **table, int *n)
 {
 	php_sqlite3_db_object *intern = php_sqlite3_db_from_obj(object);
 
-	if (intern->funcs == NULL && intern->collations == NULL) {
+	if (intern->funcs == NULL && intern->collations == NULL && !ZEND_FCC_INITIALIZED(intern->authorizer_fcc)) {
 		/* Fast path without allocations */
 		*table = NULL;
 		*n = 0;
 		return zend_std_get_gc(object, table, n);
 	} else {
 		zend_get_gc_buffer *gc_buffer = zend_get_gc_buffer_create();
+
+		php_sqlite3_gc_buffer_add_fcc(gc_buffer, &intern->authorizer_fcc);
 
 		php_sqlite3_func *func = intern->funcs;
 		while (func != NULL) {

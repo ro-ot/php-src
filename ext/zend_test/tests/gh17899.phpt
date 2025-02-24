@@ -1,7 +1,9 @@
 --TEST--
-GH-17797 (zend_test_compile_string crash on invalid script path)
+GH-17899 (zend_test_compile_string with opcache crash on invalid script path)
 --EXTENSIONS--
 zend_test
+--INI--
+opcache.enable_cli=1
 --CREDITS--
 YuanchengJiang
 --FILE--
@@ -30,3 +32,4 @@ Stack trace:
   thrown in <?php
 require("sumfile.php");
 ?> on line %d
+
