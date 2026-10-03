@@ -13,6 +13,8 @@ PHP                                                                        NEWS
 - Intl:
   . Fixed Collator attribute and strength methods not rejecting an
     unconstructed Collator. (Ilia Alshanetsky)
+  . Added optional $availableLocales argument to Locale::acceptFromHttp()
+    (GH-24074). (David Carlier)
 
 - Lexbor:
   . Merge patches lexbor/lexbor@8a14bc0 and lexbor/lexbor@f67ce4b, fixing a
@@ -77,6 +79,12 @@ PHP                                                                        NEWS
 - SQLite:
   . Fixed a crash when SQLite3::close() is called from a userland callback.
     (Ilia Alshanetsky)
+  . Fixed bug GH-22051 (Inconsistent error reporting in SQLite3Result::reset()
+    and SQLite3Result::finalize()). (Ilia Alshanetsky)
+
+- Streams:
+  . Applied the so_linger, so_rcvbuf and so_sndbuf context options to unix
+    sockets. (David Carlier)
 
 - Standard:
   . Fixed bug #60110 (fclose(), file_put_contents(), copy() do not return false
